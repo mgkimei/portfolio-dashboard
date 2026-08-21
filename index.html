@@ -374,7 +374,9 @@
   var LEGACY_KEY = "portfolioOverrides.v1";
   var HISTORY_KEY = "priceHistory.v1";
   var API_URL = "/api/quotes";
+  var DXY_URL = "/api/dxy";
   var POLL_MS = 60000;
+  var DXY_POLL_MS = 300000;
 
   // ---------- live market data (populated by loadLiveData(), see bottom) ----------
   var usdKrw = null, usdKrwChgPct = null;
@@ -1058,7 +1060,6 @@
       if (!data.quotes || data.usdKrw == null) throw new Error("empty payload");
 
       usdKrw = data.usdKrw; usdKrwChgPct = data.usdKrwChgPct;
-      dxy = data.dxy; dxyChgPct = data.dxyChgPct;
       jpyKrw100 = data.jpyKrw100; jpyKrwChgPct = data.jpyKrwChgPct;
       usdJpy = data.usdJpy; usdJpyChgPct = data.usdJpyChgPct;
       quotes = data.quotes;
@@ -1067,7 +1068,8 @@
       var fetchedIso = new Date(data.fetchedAt * 1000).toISOString();
       fxAsOf = fetchedIso;
       usQuoteAsOf = data.usQuoteTime ? new Date(data.usQuoteTime * 1000).toISOString() : fetchedIso;
-      krQuoteAsOf = data.krQuoteTime ? new Date(data.krQuoteTime * 1000).toISOString() : fetchedIso;
+      // krQuoteTime comes from Naver already as an ISO string (with +09:00 offset), not a unix timestamp
+      krQuoteAsOf = data.krQuoteTime ? new Date(data.krQuoteTime).toISOString() : fetchedIso;
 
       history = appendHistory({ t: fetchedIso, usdKrw: usdKrw, quotes: quotes, krwQuotes: krwQuotes });
 
@@ -1085,9 +1087,25 @@
     }
   }
 
+  async function loadDxy() {
+    try {
+      var res = await fetch(DXY_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var data = await res.json();
+      if (data.dxy == null) return;
+      dxy = data.dxy;
+      dxyChgPct = data.dxyChgPct;
+      if (dataReady) renderFxStrip();
+    } catch (e) {
+      console.error("loadDxy failed:", e);
+    }
+  }
+
   history = loadPersistedHistory();
   loadLiveData();
+  loadDxy();
   setInterval(loadLiveData, POLL_MS);
+  setInterval(loadDxy, DXY_POLL_MS);
 })();
 </script>
 </body>

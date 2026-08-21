@@ -1,122 +1,103 @@
 """
 Vercel Python serverless function: /api/quotes
 
-Fetches live prices server-side from Yahoo Finance's public (unauthenticated)
-chart endpoint - no API key needed, no CORS issue since this runs on the
-server, not in the visitor's browser. Returns one clean JSON payload the
-dashboard's frontend can consume directly.
+Core, frequently-polled data: 5 US holdings + USD/KRW + USD/JPY via Twelvedata
+(7 credits - Twelvedata's free tier caps at 8 credits/minute, so this must
+stay under that on its own) plus the 2 KRW-native ETFs via Naver's public
+mobile API (no key, no credit cost). The dollar index (DXY) is intentionally
+NOT here - seeing it needs 5 more Twelvedata credits, which would blow the
+per-minute cap - it lives in the separate, less-frequently-polled /api/dxy.
 """
 
 import json
+import os
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
-SYMBOLS = {
-    "GLD": "GLD",
-    "CRCL": "CRCL",
-    "MSTR": "MSTR",
-    "MSTU": "MSTU",
-    "TSLA": "TSLA",
-    "TIGER_SP500": "488500.KS",
-    "TIGER_DIV": "458730.KS",
-    "USDKRW": "KRW=X",
-    "USDJPY": "JPY=X",
-    "DXY": "DX-Y.NYB",
-}
-
-# Alternate hostnames Yahoo's unauthenticated chart API answers on - rotating
-# across them, one request at a time (never in parallel), avoids tripping
-# its per-connection burst rate limit.
-HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]
-
+TWELVEDATA_KEY = os.environ.get("TWELVEDATA_API_KEY", "dd706d353688442488eed00adca58530")
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 
-# Best-effort last-known-good cache. Serverless instances get reused ("warm")
-# across nearby requests, so this often survives a few invocations even though
-# it is not guaranteed to persist - it costs nothing when it doesn't. Its job
-# is to keep serving a real (if slightly stale) price during a transient
-# Yahoo rate-limit/outage instead of a bare null.
-_last_good = {}
+US_SYMBOLS = ["GLD", "CRCL", "MSTR", "MSTU", "TSLA"]
+FX_SYMBOLS = ["USD/KRW", "USD/JPY"]
+KR_ETFS = {"TIGER 미국S&P500동일가중": "488500", "TIGER 미국배당다우존스": "458730"}
+
+_last_good = {}  # best-effort warm-instance cache, see note in build_payload()
 
 
-def fetch_symbol(symbol, attempt=0):
-    host = HOSTS[attempt % len(HOSTS)]
-    url = "https://" + host + "/v8/finance/chart/" + symbol
+def _get_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        return json.loads(resp.read())
+
+
+def twelvedata_batch(symbols):
+    """One batched call = one HTTP request, but still 1 credit per symbol."""
+    joined = ",".join(urllib.parse.quote(s, safe="") for s in symbols)
+    url = "https://api.twelvedata.com/quote?symbol=" + joined + "&apikey=" + TWELVEDATA_KEY
+    out = {}
     try:
-        with urllib.request.urlopen(req, timeout=6) as resp:
-            data = json.loads(resp.read())
-        meta = data["chart"]["result"][0]["meta"]
-        price = meta.get("regularMarketPrice")
-        prev = meta.get("previousClose") or meta.get("chartPreviousClose")
-        ts = meta.get("regularMarketTime")
-        chg_pct = None
-        if price is not None and prev:
-            chg_pct = (price - prev) / prev * 100
-        result = {"price": price, "prevClose": prev, "changePct": chg_pct, "time": ts, "stale": False}
-        if price is not None:
-            _last_good[symbol] = result
-        return result
-    except urllib.error.HTTPError as e:
-        if e.code == 429 and attempt < 2:
-            time.sleep(0.35)
-            return fetch_symbol(symbol, attempt + 1)
-        if symbol in _last_good:
-            stale = dict(_last_good[symbol])
-            stale["stale"] = True
-            return stale
-        return {"price": None, "prevClose": None, "changePct": None, "time": None, "stale": True, "error": str(e)}
+        data = _get_json(url)
+        # single-symbol requests come back as one flat object instead of {symbol: {...}}
+        if len(symbols) == 1:
+            data = {symbols[0]: data}
+        for sym in symbols:
+            row = data.get(sym)
+            if not row or row.get("status") == "error" or "close" not in row:
+                out[sym] = {"price": None, "prevClose": None, "changePct": None, "time": None,
+                            "error": (row or {}).get("message", "missing")}
+                continue
+            price = float(row["close"])
+            prev = float(row["previous_close"]) if row.get("previous_close") else None
+            chg = float(row["percent_change"]) if row.get("percent_change") not in (None, "") else None
+            out[sym] = {"price": price, "prevClose": prev, "changePct": chg, "time": row.get("timestamp")}
+            _last_good[sym] = out[sym]
     except Exception as e:
-        if symbol in _last_good:
-            stale = dict(_last_good[symbol])
-            stale["stale"] = True
-            return stale
-        return {"price": None, "prevClose": None, "changePct": None, "time": None, "stale": True, "error": str(e)}
+        for sym in symbols:
+            out[sym] = _last_good.get(sym) or {"price": None, "prevClose": None, "changePct": None, "time": None, "error": str(e)}
+    return out
+
+
+def naver_quote(code):
+    url = "https://m.stock.naver.com/api/stock/" + code + "/basic"
+    key = "naver:" + code
+    try:
+        data = _get_json(url)
+        price = float(data["closePrice"].replace(",", ""))
+        chg_pct = float(data["fluctuationsRatio"])
+        result = {"price": price, "changePct": chg_pct, "time": data.get("localTradedAt")}
+        _last_good[key] = result
+        return result
+    except Exception as e:
+        return _last_good.get(key) or {"price": None, "changePct": None, "time": None, "error": str(e)}
 
 
 def build_payload():
-    # Sequential, not parallel: Yahoo's unofficial endpoint rate-limits bursts
-    # of concurrent connections from one IP much more aggressively than a
-    # steady stream of single requests.
-    results = {}
-    for key, sym in SYMBOLS.items():
-        results[key] = fetch_symbol(sym)
+    us = twelvedata_batch(US_SYMBOLS)
+    fx = twelvedata_batch(FX_SYMBOLS)
+    kr = {name: naver_quote(code) for name, code in KR_ETFS.items()}
 
     payload = {
-        "quotes": {
-            "GLD": results["GLD"]["price"],
-            "CRCL": results["CRCL"]["price"],
-            "MSTR": results["MSTR"]["price"],
-            "MSTU": results["MSTU"]["price"],
-            "TSLA": results["TSLA"]["price"],
-        },
-        "krwQuotes": {
-            "TIGER 미국S&P500동일가중": results["TIGER_SP500"]["price"],
-            "TIGER 미국배당다우존스": results["TIGER_DIV"]["price"],
-        },
-        "usdKrw": results["USDKRW"]["price"],
-        "usdKrwChgPct": results["USDKRW"]["changePct"],
-        "dxy": results["DXY"]["price"],
-        "dxyChgPct": results["DXY"]["changePct"],
-        "usdJpy": results["USDJPY"]["price"],
-        "usdJpyChgPct": results["USDJPY"]["changePct"],
+        "quotes": {sym: us[sym]["price"] for sym in US_SYMBOLS},
+        "krwQuotes": {name: kr[name]["price"] for name in KR_ETFS},
+        "usdKrw": fx["USD/KRW"]["price"],
+        "usdKrwChgPct": fx["USD/KRW"]["changePct"],
+        "usdJpy": fx["USD/JPY"]["price"],
+        "usdJpyChgPct": fx["USD/JPY"]["changePct"],
         "fetchedAt": int(time.time()),
-        "usQuoteTime": results["TSLA"]["time"],
-        "krQuoteTime": results["TIGER_SP500"]["time"],
+        "usQuoteTime": us["TSLA"]["time"],
+        "krQuoteTime": kr["TIGER 미국S&P500동일가중"]["time"],
     }
 
-    usd_krw = results["USDKRW"]["price"]
-    usd_jpy = results["USDJPY"]["price"]
+    usd_krw, usd_jpy = payload["usdKrw"], payload["usdJpy"]
     if usd_krw and usd_jpy:
-        jpy_krw_100 = usd_krw / usd_jpy * 100
-        payload["jpyKrw100"] = jpy_krw_100
-        prev_krw = results["USDKRW"]["prevClose"]
-        prev_jpy = results["USDJPY"]["prevClose"]
+        payload["jpyKrw100"] = usd_krw / usd_jpy * 100
+        prev_krw, prev_jpy = fx["USD/KRW"]["prevClose"], fx["USD/JPY"]["prevClose"]
         if prev_krw and prev_jpy:
-            prev_jpy_krw_100 = prev_krw / prev_jpy * 100
-            payload["jpyKrwChgPct"] = (jpy_krw_100 - prev_jpy_krw_100) / prev_jpy_krw_100 * 100
+            prev_100 = prev_krw / prev_jpy * 100
+            payload["jpyKrwChgPct"] = (payload["jpyKrw100"] - prev_100) / prev_100 * 100
         else:
             payload["jpyKrwChgPct"] = None
     else:
@@ -136,7 +117,7 @@ class handler(BaseHTTPRequestHandler):
             body = json.dumps({"error": str(e)}).encode("utf-8")
             self.send_response(500)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "s-maxage=20, stale-while-revalidate=40")
+        self.send_header("Cache-Control", "s-maxage=45, stale-while-revalidate=60")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
