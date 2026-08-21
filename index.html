@@ -1,0 +1,1094 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>포트폴리오 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0d0f14;
+    color: #f2f3f5;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 64px;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+  table { border-collapse: collapse; width: 100%; }
+  button { font-family: inherit; }
+
+  /* ---- palette ---- */
+  :root {
+    --bg: #0d0f14;
+    --surface: #171a22;
+    --surface-2: #1c202a;
+    --ink: #f2f3f5;
+    --ink2: #9aa0ad;
+    --muted: #666c7a;
+    --line: #262b36;
+    --accent: #d9962b;
+    --good: #35c07a;
+    --bad: #e05a5a;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #4caf3c; --s7: #9085e9; --s8: #e66767;
+  }
+
+  /* ---- portfolio tabs ---- */
+  .tabbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .tab-chip {
+    display: flex; align-items: center; gap: 7px; padding: 7px 8px 7px 13px;
+    border-radius: 8px; background: var(--surface); border: 1px solid var(--line);
+    font-size: 12.5px; font-weight: 500; color: var(--ink2); cursor: pointer; user-select: none;
+  }
+  .tab-chip:hover { border-color: #363b47; }
+  .tab-chip.active { background: var(--surface-2); border-color: var(--accent); color: var(--ink); }
+  .tab-chip .tab-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab-chip .tab-rename {
+    color: var(--muted); font-size: 11px; line-height: 1; padding: 2px 3px; border-radius: 4px; opacity: 0.6;
+  }
+  .tab-chip .tab-rename:hover { color: var(--accent); opacity: 1; background: rgba(217,150,43,0.12); }
+  .tab-chip .tab-close {
+    color: var(--muted); font-size: 13px; line-height: 1; padding: 2px 3px; border-radius: 4px;
+  }
+  .tab-chip .tab-close:hover { color: var(--bad); background: rgba(224,90,90,0.12); }
+  .tab-add {
+    width: 30px; height: 30px; border-radius: 8px; background: transparent;
+    border: 1px dashed var(--line); color: var(--muted); font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tab-add:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ---- header ---- */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 14px 24px;
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .who { font-size: 12.5px; color: var(--muted); letter-spacing: 0.04em; }
+  .topbar .who b { color: var(--ink2); font-weight: 600; }
+  .topbar .datetime {
+    display: flex; align-items: baseline; gap: 12px;
+    font-family: "IBM Plex Mono", monospace;
+  }
+  .topbar .datetime .date { font-size: 26px; font-weight: 600; color: var(--ink); }
+  .topbar .datetime .clock { font-size: 22px; font-weight: 500; color: var(--accent); }
+  .freshness {
+    margin-top: 6px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .freshness-row {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline;
+  }
+  .freshness .dot { color: var(--good); }
+  .fx-item { display: inline-flex; gap: 5px; align-items: baseline; }
+  .fx-item .fx-label { color: var(--muted); }
+  .fx-item .fx-val { color: var(--ink2); font-family: "IBM Plex Mono", monospace; }
+  .chg-badge { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .chg-badge.pos { color: var(--good); }
+  .chg-badge.neg { color: var(--bad); }
+  .chg-badge.flat { color: var(--muted); }
+
+  /* ---- hero ---- */
+  .stat-row {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; background: var(--line); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden; margin-bottom: 20px;
+  }
+  .stat-cell { background: var(--surface); padding: 18px 20px; }
+  .stat-cell .label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 9px; }
+  .stat-cell .val { font-family: "IBM Plex Mono", monospace; font-size: 25px; font-weight: 600; }
+  .stat-cell .sub { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; margin-top: 6px; color: var(--ink2); }
+  .stat-cell .sub.pos { color: var(--good); }
+  .stat-cell .sub.neg { color: var(--bad); }
+  .stat-cell .val.pos { color: var(--good); }
+  .stat-cell .val.neg { color: var(--bad); }
+
+  /* ---- section titles ---- */
+  .sec-title { font-size: 13px; font-weight: 600; color: var(--ink2); margin: 0 0 12px; display: flex; justify-content: space-between; align-items: baseline; }
+  .sec-title .note { font-size: 10.5px; font-weight: 400; color: var(--muted); }
+
+  /* ---- trend row ---- */
+  .trend-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .trend-card .card-title { font-size: 11.5px; color: var(--ink2); font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .trend-card .card-title .chg { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .trend-card .card-title .chg.pos { color: var(--good); }
+  .trend-card .card-title .chg.neg { color: var(--bad); }
+  .trend-card .card-title .chg.flat { color: var(--muted); }
+  .trend-disclaimer { font-size: 10.5px; color: var(--muted); margin: 8px 0 20px; }
+  .single-dot-note { display: flex; align-items: center; gap: 8px; height: 78px; color: var(--muted); font-size: 11.5px; }
+  .single-dot-note .dotmark { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+  /* ---- pie row ---- */
+  .pie-row { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .pie-card .card-title { font-size: 13px; font-weight: 600; color: var(--ink); margin: 0 0 16px; }
+  .pie-body { display: flex; align-items: center; gap: 22px; }
+  .pie-legend { display: flex; flex-direction: column; gap: 9px; flex: 1; min-width: 0; }
+  .pie-legend .item { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+  .pie-legend .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .pie-legend .nm { flex: 1; color: var(--ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pie-legend .wt { font-family: "IBM Plex Mono", monospace; color: var(--ink2); font-weight: 600; width: 48px; text-align: right; flex: none; }
+  .pie-legend .vl { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-size: 11px; width: 96px; text-align: right; flex: none; }
+
+  /* ---- table ---- */
+  .table-card table { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; width: 100%; }
+  .table-card thead th { text-align: right; font-weight: 500; color: var(--muted); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; padding: 0 10px 10px 0; border-bottom: 1px solid var(--line); font-family: "IBM Plex Sans", sans-serif; }
+  .table-card thead th:first-child { text-align: left; font-family: "IBM Plex Sans", sans-serif; }
+  .table-card tbody td { padding: 11px 10px 11px 0; border-bottom: 1px solid var(--line); text-align: right; }
+  .table-card tbody td:first-child { text-align: left; font-family: "IBM Plex Sans", sans-serif; font-weight: 500; }
+  .table-card tbody tr.data-row:last-child td { border-bottom: none; }
+  .table-card tbody tr.data-row:hover { background: rgba(255,255,255,0.025); }
+  .nm-cell { display: flex; align-items: center; gap: 9px; }
+  .nm-cell .sw { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .gain.pos { color: var(--good); }
+  .gain.neg { color: var(--bad); }
+  tr.group-row td {
+    padding: 9px 10px 9px 0;
+    background: var(--surface-2);
+    color: var(--ink2);
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid var(--line);
+  }
+  tr.group-row .grp-wt { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-weight: 500; }
+
+  /* ---- edit button + modal ---- */
+  .edit-row { display: flex; justify-content: center; margin-top: 20px; }
+  .edit-btn {
+    appearance: none; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); font-size: 13px; font-weight: 500; padding: 11px 20px;
+    border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .edit-btn:hover { background: var(--surface-2); border-color: #363b47; }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(3,4,6,0.72);
+    display: none; align-items: center; justify-content: center; z-index: 100; padding: 24px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    max-width: 640px; width: 100%; max-height: 86vh; overflow-y: auto; padding: 22px 24px;
+  }
+  .modal h2 { font-size: 15px; margin: 0 0 4px; }
+  .modal .modal-sub { font-size: 12px; color: var(--muted); margin: 0 0 18px; }
+  .edit-table { width: 100%; border-collapse: collapse; }
+  .edit-table th { text-align: left; font-size: 10.5px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; padding: 0 6px 8px; }
+  .edit-table td { padding: 6px; vertical-align: middle; }
+  .edit-table .badge { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .edit-table input {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--ink); font-family: "IBM Plex Mono", monospace; font-size: 12.5px; padding: 7px 8px;
+  }
+  .edit-table input[type="text"] { font-family: "IBM Plex Sans", sans-serif; }
+  .edit-table input:focus, .edit-table select:focus { outline: none; border-color: var(--accent); }
+  .edit-table select {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--ink); font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; padding: 7px 8px;
+  }
+  .edit-table input:disabled, .edit-table select:disabled { opacity: 0.4; cursor: not-allowed; }
+  .custom-fields { display: flex; gap: 6px; margin-top: 6px; }
+  .custom-fields input, .custom-fields select { font-size: 11.5px; padding: 6px 7px; }
+  .row-del {
+    appearance: none; border: none; background: transparent; color: var(--muted);
+    font-size: 15px; cursor: pointer; padding: 4px 6px; border-radius: 5px;
+  }
+  .row-del:hover { color: var(--bad); background: rgba(224,90,90,0.12); }
+  .add-row-btn {
+    appearance: none; border: 1px dashed var(--line); background: transparent; color: var(--muted);
+    font-size: 12px; padding: 8px; border-radius: 7px; cursor: pointer; width: 100%; margin-top: 8px;
+  }
+  .add-row-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .portfolio-name-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .portfolio-name-row label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .portfolio-name-row input {
+    flex: 1; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--ink); font-size: 13px; padding: 8px 10px;
+  }
+  .portfolio-name-row input:focus { outline: none; border-color: var(--accent); }
+  .modal-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 20px; }
+  .modal-actions .left { display: flex; gap: 10px; }
+  .btn { appearance: none; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 12.5px; font-weight: 500; padding: 9px 16px; border-radius: 7px; cursor: pointer; }
+  .btn:hover { border-color: #363b47; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #1a1206; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost { background: transparent; color: var(--muted); border-color: transparent; }
+  .btn.ghost:hover { color: var(--ink2); }
+
+  /* ---- tooltip ---- */
+  .tt {
+    position: absolute; pointer-events: none; z-index: 20;
+    padding: 6px 9px; border-radius: 6px; font-size: 11.5px; line-height: 1.4;
+    white-space: nowrap; opacity: 0; transform: translate(-50%, -100%);
+    transition: opacity 0.1s ease; background: #f2f3f5; color: #12151c;
+    font-family: "IBM Plex Mono", monospace;
+  }
+  .tt.show { opacity: 1; }
+
+  @media (max-width: 760px) {
+    .stat-row, .trend-row { grid-template-columns: 1fr; }
+    .pie-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="tabbar" id="tabbar"></div>
+
+  <div class="topbar">
+    <div>
+      <div class="who">계좌 <b>종합 포트폴리오</b> · 원화 환산</div>
+      <div class="freshness">
+        <div class="freshness-row">
+          <span><span class="dot">●</span> 국내주식 <span id="kr-asof">-</span></span>
+          <span><span class="dot">●</span> 해외주식 <span id="us-asof">-</span></span>
+          <span id="live-status">실시간 시세 불러오는 중…</span>
+        </div>
+        <div class="freshness-row" id="fx-row">
+          <span class="fx-item"><span class="fx-label">달러인덱스</span> <span class="fx-val" id="fx-dxy">-</span> <span class="chg-badge" id="fx-dxy-chg">-</span></span>
+          <span class="fx-item"><span class="fx-label">달러 환율</span> <span class="fx-val" id="fx-usdkrw">-</span> <span class="chg-badge" id="fx-usdkrw-chg">-</span></span>
+          <span class="fx-item"><span class="fx-label">엔화 환율</span> <span class="fx-val" id="fx-jpykrw">-</span> <span class="chg-badge" id="fx-jpykrw-chg">-</span></span>
+          <span class="fx-item"><span class="fx-label">엔달러 환율</span> <span class="fx-val" id="fx-usdjpy">-</span> <span class="chg-badge" id="fx-usdjpy-chg">-</span></span>
+          <span>(<span id="fx-asof">-</span> 기준)</span>
+        </div>
+      </div>
+    </div>
+    <div class="datetime">
+      <span class="date" id="live-date">-</span>
+      <span class="clock" id="live-clock">-</span>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-cell">
+      <div class="label">투자원금</div>
+      <div class="val tnum" id="s-cost">-</div>
+    </div>
+    <div class="stat-cell">
+      <div class="label">평가금액</div>
+      <div class="val tnum" id="s-value">-</div>
+    </div>
+    <div class="stat-cell">
+      <div class="label">총 손익</div>
+      <div class="val tnum" id="s-gain">-</div>
+      <div class="sub tnum" id="s-gain-pct">-</div>
+    </div>
+  </div>
+
+  <div class="trend-row">
+    <div class="card trend-card">
+      <div class="card-title"><span>최근 1개월</span><span class="chg tnum" id="t1-chg">-</span></div>
+      <div id="t1"></div>
+    </div>
+    <div class="card trend-card">
+      <div class="card-title"><span>최근 1년</span><span class="chg tnum" id="t2-chg">-</span></div>
+      <div id="t2"></div>
+    </div>
+    <div class="card trend-card">
+      <div class="card-title"><span>전체 기간</span><span class="chg tnum" id="t3-chg">-</span></div>
+      <div id="t3"></div>
+    </div>
+  </div>
+  <p class="trend-disclaimer">※ 이 브라우저에 저장된 실제 시세 기록만 표시해요. 페이지를 열 때마다(60초마다도) 스냅샷이 쌓이면서 점이 하나씩 늘어나요 — 다른 기기·브라우저에서는 그 기기 자체의 기록부터 다시 쌓여요.</p>
+
+  <div class="pie-row">
+    <div class="card pie-card">
+      <div class="card-title">포트폴리오</div>
+      <div class="pie-body">
+        <div id="p-holdings"></div>
+        <div class="pie-legend" id="l-holdings"></div>
+      </div>
+    </div>
+    <div class="card pie-card">
+      <div class="card-title">변동성 배분</div>
+      <div class="pie-body">
+        <div id="p-vol"></div>
+        <div class="pie-legend" id="l-vol"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card table-card">
+    <div class="sec-title">보유 종목 <span class="note" id="row-count"></span></div>
+    <table>
+      <thead><tr><th>종목</th><th>수량</th><th>평단가</th><th>현재가</th><th>투자원금</th><th>평가금액</th><th>비중</th><th>손익</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="edit-row">
+    <button class="edit-btn" id="edit-open">✎ 보유 종목 수정</button>
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2>보유 종목 수정</h2>
+    <p class="modal-sub">목록에서 종목을 고르고 수량 · 평단가만 채우면 나머지(현재가·평가금액·비중·손익)는 자동으로 계산돼요. 목록에 없는 종목은 "직접 입력"으로 추가하고 현재가를 수동으로 넣어주세요 — 자동 갱신은 안 돼요.</p>
+    <div class="portfolio-name-row">
+      <label>포트폴리오 이름</label>
+      <input type="text" id="portfolio-name-input">
+    </div>
+    <table class="edit-table">
+      <thead><tr><th style="width:44%">종목</th><th style="width:16%">수량</th><th style="width:16%">평단가</th><th style="width:16%">현재가(수동)</th><th style="width:8%"></th></tr></thead>
+      <tbody id="edit-tbody"></tbody>
+    </table>
+    <button class="add-row-btn" id="edit-add-row">+ 종목 추가</button>
+    <div class="modal-actions">
+      <div class="left">
+        <button class="btn ghost" id="edit-reset">초기화</button>
+      </div>
+      <div class="left">
+        <button class="btn" id="edit-cancel">취소</button>
+        <button class="btn primary" id="edit-save">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var svgNS = "http://www.w3.org/2000/svg";
+  var PORT_KEY = "portfolios.v2";
+  var LEGACY_KEY = "portfolioOverrides.v1";
+  var HISTORY_KEY = "priceHistory.v1";
+  var API_URL = "/api/quotes";
+  var POLL_MS = 60000;
+
+  // ---------- live market data (populated by loadLiveData(), see bottom) ----------
+  var usdKrw = null, usdKrwChgPct = null;
+  var dxy = null, dxyChgPct = null;
+  var jpyKrw100 = null, jpyKrwChgPct = null;
+  var usdJpy = null, usdJpyChgPct = null;
+  var fxAsOf = null, usQuoteAsOf = null, krQuoteAsOf = null;
+  var quotes = {};
+  var krwQuotes = {};
+  var history = [];
+  var dataReady = false;
+
+  // Catalog of instruments the dashboard can auto-price. "__CASH__" and "__CUSTOM__"
+  // are special keys handled separately from the live quote lookups.
+  var catalog = [
+    { key: "TIGER 미국S&P500동일가중", label: "TIGER 미국S&P500동일가중", ccy: "KRW", type: "저변동" },
+    { key: "TIGER 미국배당다우존스",   label: "TIGER 미국배당다우존스",   ccy: "KRW", type: "저변동" },
+    { key: "GLD",  label: "GLD",  ccy: "USD", type: "저변동" },
+    { key: "CRCL", label: "CRCL", ccy: "USD", type: "고변동" },
+    { key: "MSTR", label: "MSTR", ccy: "USD", type: "고변동" },
+    { key: "MSTU", label: "MSTU", ccy: "USD", type: "고변동" },
+    { key: "TSLA", label: "TSLA", ccy: "USD", type: "고변동" },
+    { key: "__CASH__",   label: "현금(원화)",         ccy: "KRW", type: "현금성" },
+    { key: "__CUSTOM__", label: "직접 입력 (수동 현재가)", ccy: "KRW", type: "저변동" }
+  ];
+  function catalogEntry(key) {
+    var found = null;
+    catalog.forEach(function (c) { if (c.key === key) found = c; });
+    return found;
+  }
+  var PALETTE_SLOTS = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+
+  function seedDefaultHoldings() {
+    return [
+      { rid: uid(), catalogKey: "TIGER 미국S&P500동일가중", name: "TIGER 미국S&P500동일가중", qty: 3948,  avg: 13132,  ccy: "KRW", type: "저변동", color: "s1" },
+      { rid: uid(), catalogKey: "TIGER 미국배당다우존스",   name: "TIGER 미국배당다우존스",   qty: 7516,  avg: 14590,  ccy: "KRW", type: "저변동", color: "s2" },
+      { rid: uid(), catalogKey: "GLD",  name: "GLD",  qty: 137,   avg: 390.19, ccy: "USD", type: "저변동", color: "s3" },
+      { rid: uid(), catalogKey: "CRCL", name: "CRCL", qty: 200,   avg: 65.05,  ccy: "USD", type: "고변동", color: "s8" },
+      { rid: uid(), catalogKey: "MSTR", name: "MSTR", qty: 600,   avg: 136.23, ccy: "USD", type: "고변동", color: "s4" },
+      { rid: uid(), catalogKey: "MSTU", name: "MSTU", qty: 10000, avg: 3.35,   ccy: "USD", type: "고변동", color: "s5" },
+      { rid: uid(), catalogKey: "TSLA", name: "TSLA", qty: 57,    avg: 329.3,  ccy: "USD", type: "고변동", color: "s7" },
+      { rid: uid(), catalogKey: "__CASH__", name: "현금(원화)", qty: 1, avg: 29000000, ccy: "KRW", type: "현금성", color: "s6" }
+    ];
+  }
+
+  // legacy single-portfolio override ids -> catalog key, for migrating pre-tab data
+  var LEGACY_ID_MAP = {
+    tiger_sp500: "TIGER 미국S&P500동일가중", tiger_div: "TIGER 미국배당다우존스",
+    gld: "GLD", crcl: "CRCL", mstr: "MSTR", mstu: "MSTU", tsla: "TSLA", cash: "__CASH__"
+  };
+
+  function loadStore() {
+    try {
+      var raw = localStorage.getItem(PORT_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+
+    var seeded = seedDefaultHoldings();
+    try {
+      var legacyRaw = localStorage.getItem(LEGACY_KEY);
+      if (legacyRaw) {
+        var legacyOverrides = JSON.parse(legacyRaw);
+        seeded.forEach(function (h) {
+          var oldId = Object.keys(LEGACY_ID_MAP).filter(function (k) { return LEGACY_ID_MAP[k] === h.catalogKey; })[0];
+          var ov = oldId && legacyOverrides[oldId];
+          if (ov) {
+            if (typeof ov.name === "string" && ov.name.trim()) h.name = ov.name.trim();
+            if (isFinite(ov.qty)) h.qty = ov.qty;
+            if (isFinite(ov.avg)) h.avg = ov.avg;
+          }
+        });
+      }
+    } catch (e) {}
+
+    var store = { activeId: "p1", list: [{ id: "p1", name: "기본 포트폴리오", holdings: seeded }] };
+    saveStore(store);
+    return store;
+  }
+  function saveStore(s) { localStorage.setItem(PORT_KEY, JSON.stringify(s)); }
+  function getActivePortfolio(store) {
+    var found = null;
+    store.list.forEach(function (p) { if (p.id === store.activeId) found = p; });
+    return found || store.list[0];
+  }
+
+  function priceFor(h) {
+    if (h.catalogKey === "__CASH__") return h.avg;
+    if (h.catalogKey === "__CUSTOM__") return isFinite(h.manualCur) ? h.manualCur : h.avg;
+    var live = h.ccy === "USD" ? quotes[h.catalogKey] : krwQuotes[h.catalogKey];
+    return (live != null && isFinite(live)) ? live : h.avg;
+  }
+
+  function buildHoldings() {
+    var store = loadStore();
+    var portfolio = getActivePortfolio(store);
+    return portfolio.holdings.map(function (d) {
+      var h = JSON.parse(JSON.stringify(d));
+      h.id = h.rid;
+      h.cur = priceFor(h);
+      var mult = h.ccy === "USD" ? usdKrw : 1;
+      h.avgKrw = h.avg * mult;
+      h.curKrw = h.cur * mult;
+      h.value = h.qty * h.curKrw;
+      h.cost = h.qty * h.avgKrw;
+      h.gain = h.value - h.cost;
+      h.gainPct = h.cost > 0 ? (h.gain / h.cost * 100) : 0;
+      return h;
+    });
+  }
+
+  function css(varName) { return getComputedStyle(document.documentElement).getPropertyValue("--" + varName).trim(); }
+  function color(slot) { return css(slot); }
+
+  // ---------- formatting ----------
+  function fmtKRW(n, withSign) {
+    var sign = withSign && n > 0 ? "+" : (n < 0 ? "-" : "");
+    return sign + "₩" + Math.round(Math.abs(n)).toLocaleString("ko-KR");
+  }
+  function fmtPct(n) {
+    var sign = n > 0 ? "+" : "";
+    return sign + n.toFixed(2) + "%";
+  }
+  function fmtQty(h) {
+    return h.catalogKey === "__CASH__" ? "-" : h.qty.toLocaleString("ko-KR");
+  }
+
+  // ---------- header: live date/clock ----------
+  function tick() {
+    var now = new Date();
+    document.getElementById("live-date").textContent = now.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" });
+    document.getElementById("live-clock").textContent = now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  function fmtAsOf(iso) {
+    if (!iso) return "-";
+    var d = new Date(iso);
+    return d.toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  // ---------- FX strip ----------
+  function fmtChg(pct) {
+    if (pct == null || !isFinite(pct)) return { text: "-", cls: "flat" };
+    if (pct === 0) return { text: "0.00%", cls: "flat" };
+    var sign = pct > 0 ? "+" : "";
+    return { text: sign + pct.toFixed(2) + "%", cls: pct > 0 ? "pos" : "neg" };
+  }
+  function setFx(valId, chgId, valText, pct) {
+    document.getElementById(valId).textContent = valText;
+    var c = fmtChg(pct);
+    var el = document.getElementById(chgId);
+    el.textContent = (pct > 0 ? "▲" : pct < 0 ? "▼" : "-") + " " + c.text;
+    el.className = "chg-badge " + c.cls;
+  }
+  function renderFxStrip() {
+    setFx("fx-dxy", "fx-dxy-chg", dxy != null ? dxy.toFixed(2) : "-", dxyChgPct);
+    setFx("fx-usdkrw", "fx-usdkrw-chg", usdKrw != null ? ("₩" + usdKrw.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : "-", usdKrwChgPct);
+    setFx("fx-jpykrw", "fx-jpykrw-chg", jpyKrw100 != null ? ("₩" + jpyKrw100.toFixed(2) + "/100¥") : "-", jpyKrwChgPct);
+    setFx("fx-usdjpy", "fx-usdjpy-chg", usdJpy != null ? ("¥" + usdJpy.toFixed(2)) : "-", usdJpyChgPct);
+    document.getElementById("kr-asof").textContent = fmtAsOf(krQuoteAsOf);
+    document.getElementById("us-asof").textContent = fmtAsOf(usQuoteAsOf);
+    document.getElementById("fx-asof").textContent = fmtAsOf(fxAsOf);
+  }
+
+  // ---------- tooltip helper ----------
+  function makeTooltip(root) {
+    var el = document.createElement("div");
+    el.className = "tt";
+    root.style.position = root.style.position || "relative";
+    root.appendChild(el);
+    return {
+      show: function (x, y, html) { el.innerHTML = html; el.style.left = x + "px"; el.style.top = (y - 10) + "px"; el.classList.add("show"); },
+      hide: function () { el.classList.remove("show"); }
+    };
+  }
+
+  // ---------- trend line builder (real data only) ----------
+  function buildTrend(container, points, w, h, lineColor, gridColor) {
+    container.innerHTML = "";
+    if (points.length < 2) {
+      var note = document.createElement("div");
+      note.className = "single-dot-note";
+      note.innerHTML = '<span class="dotmark" style="background:' + lineColor + '"></span>' +
+        (points.length === 1 ? "오늘 스냅샷 1개 · 데이터가 더 쌓이면 선으로 이어져요" : "아직 기록된 스냅샷이 없어요");
+      container.appendChild(note);
+      return points.length === 1 ? { start: points[0].value, end: points[0].value, single: true } : null;
+    }
+    var series = points.map(function (p) { return p.value; });
+    var pad = 4;
+    var min = Math.min.apply(null, series), max = Math.max.apply(null, series);
+    var range = (max - min) || 1;
+    var pts = series.map(function (v, i) {
+      var x = pad + (i / (series.length - 1)) * (w - pad * 2);
+      var y = pad + (1 - (v - min) / range) * (h - pad * 2);
+      return [x, y];
+    });
+    var path = "M" + pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" L");
+    var areaPath = path + " L" + pts[pts.length - 1][0].toFixed(1) + "," + h + " L" + pts[0][0].toFixed(1) + "," + h + " Z";
+    var gid = "grad-" + Math.random().toString(36).slice(2, 9);
+
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", h);
+    svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+    svg.style.display = "block";
+    svg.style.overflow = "visible";
+
+    var defs = document.createElementNS(svgNS, "defs");
+    var grad = document.createElementNS(svgNS, "linearGradient");
+    grad.setAttribute("id", gid);
+    grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0");
+    grad.setAttribute("x2", "0"); grad.setAttribute("y2", "1");
+    grad.innerHTML = '<stop offset="0%" stop-color="' + lineColor + '" stop-opacity="0.30"/><stop offset="100%" stop-color="' + lineColor + '" stop-opacity="0"/>';
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    [0.25, 0.5, 0.75].forEach(function (f) {
+      var gy = pad + f * (h - pad * 2);
+      var line = document.createElementNS(svgNS, "line");
+      line.setAttribute("x1", 0); line.setAttribute("x2", w);
+      line.setAttribute("y1", gy); line.setAttribute("y2", gy);
+      line.setAttribute("stroke", gridColor); line.setAttribute("stroke-width", "1");
+      svg.appendChild(line);
+    });
+
+    var area = document.createElementNS(svgNS, "path");
+    area.setAttribute("d", areaPath);
+    area.setAttribute("fill", "url(#" + gid + ")");
+    area.setAttribute("stroke", "none");
+    svg.appendChild(area);
+
+    var line = document.createElementNS(svgNS, "path");
+    line.setAttribute("d", path);
+    line.setAttribute("fill", "none");
+    line.setAttribute("stroke", lineColor);
+    line.setAttribute("stroke-width", "2");
+    line.setAttribute("stroke-linecap", "round");
+    line.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(line);
+
+    var endDot = document.createElementNS(svgNS, "circle");
+    endDot.setAttribute("cx", pts[pts.length - 1][0]);
+    endDot.setAttribute("cy", pts[pts.length - 1][1]);
+    endDot.setAttribute("r", 3.5);
+    endDot.setAttribute("fill", lineColor);
+    svg.appendChild(endDot);
+
+    var hoverLine = document.createElementNS(svgNS, "line");
+    hoverLine.setAttribute("y1", pad); hoverLine.setAttribute("y2", h - pad);
+    hoverLine.setAttribute("stroke", "#666c7a"); hoverLine.setAttribute("stroke-width", "1");
+    hoverLine.setAttribute("stroke-dasharray", "2 2");
+    hoverLine.style.opacity = "0";
+    svg.appendChild(hoverLine);
+
+    var hoverDot = document.createElementNS(svgNS, "circle");
+    hoverDot.setAttribute("r", 4);
+    hoverDot.setAttribute("fill", lineColor);
+    hoverDot.setAttribute("stroke", "#fff");
+    hoverDot.setAttribute("stroke-width", "1.5");
+    hoverDot.style.opacity = "0";
+    svg.appendChild(hoverDot);
+
+    var hitRect = document.createElementNS(svgNS, "rect");
+    hitRect.setAttribute("x", 0); hitRect.setAttribute("y", 0);
+    hitRect.setAttribute("width", w); hitRect.setAttribute("height", h);
+    hitRect.setAttribute("fill", "transparent");
+    svg.appendChild(hitRect);
+
+    container.style.position = "relative";
+    container.appendChild(svg);
+    var tip = makeTooltip(container);
+
+    hitRect.addEventListener("mousemove", function (evt) {
+      var rect = svg.getBoundingClientRect();
+      var relX = ((evt.clientX - rect.left) / rect.width) * w;
+      var idx = Math.round(((relX - pad) / (w - pad * 2)) * (series.length - 1));
+      idx = Math.max(0, Math.min(series.length - 1, idx));
+      var p = pts[idx];
+      var scaleX = rect.width / w;
+      hoverLine.setAttribute("x1", p[0]); hoverLine.setAttribute("x2", p[0]);
+      hoverLine.style.opacity = "1";
+      hoverDot.setAttribute("cx", p[0]); hoverDot.setAttribute("cy", p[1]);
+      hoverDot.style.opacity = "1";
+      var d = new Date(points[idx].t);
+      var lbl = d.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      tip.show(p[0] * scaleX, p[1], "<b>" + fmtKRW(series[idx]) + "</b><br>" + lbl);
+    });
+    hitRect.addEventListener("mouseleave", function () { hoverLine.style.opacity = "0"; hoverDot.style.opacity = "0"; tip.hide(); });
+
+    return { start: series[0], end: series[series.length - 1], single: false };
+  }
+
+  function pctChip(elId, res) {
+    var el = document.getElementById(elId);
+    if (!res) { el.textContent = "데이터 없음"; el.className = "chg tnum flat"; return; }
+    if (res.single) { el.textContent = "수집 시작"; el.className = "chg tnum flat"; return; }
+    var chg = (res.end - res.start) / res.start * 100;
+    el.textContent = fmtPct(chg);
+    el.className = "chg tnum " + (chg >= 0 ? "pos" : "neg");
+  }
+
+  // ---------- pie chart builder (full pie, no hole) ----------
+  function polarToCartesian(cx, cy, r, angleDeg) {
+    var a = (angleDeg - 90) * Math.PI / 180;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  }
+  function wedgePath(cx, cy, r, startAngle, endAngle) {
+    var p1 = polarToCartesian(cx, cy, r, endAngle);
+    var p2 = polarToCartesian(cx, cy, r, startAngle);
+    var largeArc = (endAngle - startAngle) <= 180 ? 0 : 1;
+    return "M " + cx + " " + cy + " L " + p1[0].toFixed(2) + " " + p1[1].toFixed(2) +
+           " A " + r + " " + r + " 0 " + largeArc + " 0 " + p2[0].toFixed(2) + " " + p2[1].toFixed(2) + " Z";
+  }
+  function buildPie(container, items, size, gapDeg, strokeColor) {
+    container.innerHTML = "";
+    var cx = size / 2, cy = size / 2, r = size / 2 - 1;
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("width", size);
+    svg.setAttribute("height", size);
+    svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+    var angle = 0;
+    items.forEach(function (it) {
+      var sweep = it.weight / 100 * 360;
+      var start = angle + gapDeg / 2;
+      var end = angle + sweep - gapDeg / 2;
+      if (end < start) end = start;
+      var p = document.createElementNS(svgNS, "path");
+      p.setAttribute("d", wedgePath(cx, cy, r, start, end));
+      p.setAttribute("fill", it.color);
+      p.setAttribute("stroke", strokeColor);
+      p.setAttribute("stroke-width", "2");
+      p.setAttribute("stroke-linejoin", "round");
+      var title = document.createElementNS(svgNS, "title");
+      title.textContent = it.label + " · " + it.weight.toFixed(1) + "%";
+      p.appendChild(title);
+      svg.appendChild(p);
+      angle += sweep;
+    });
+    var wrap = document.createElement("div");
+    wrap.style.flex = "none";
+    wrap.appendChild(svg);
+    container.appendChild(wrap);
+  }
+
+  // ---------- history → per-period series ----------
+  function totalAt(snapshot, holdingsList) {
+    return holdingsList.reduce(function (sum, h) {
+      var price;
+      if (h.catalogKey === "__CASH__" || h.catalogKey === "__CUSTOM__") {
+        price = h.curKrw;
+      } else if (h.ccy === "USD") {
+        var usd = (snapshot.quotes && snapshot.quotes[h.catalogKey] != null) ? snapshot.quotes[h.catalogKey] : (h.cur);
+        var rate = snapshot.usdKrw != null ? snapshot.usdKrw : usdKrw;
+        price = usd * rate;
+      } else {
+        price = (snapshot.krwQuotes && snapshot.krwQuotes[h.catalogKey] != null) ? snapshot.krwQuotes[h.catalogKey] : h.curKrw;
+      }
+      return sum + h.qty * price;
+    }, 0);
+  }
+  function seriesSince(days, holdingsList) {
+    var cutoff = days === null ? -Infinity : (Date.now() - days * 86400000);
+    return history
+      .filter(function (pt) { return new Date(pt.t).getTime() >= cutoff; })
+      .sort(function (a, b) { return new Date(a.t) - new Date(b.t); })
+      .map(function (pt) { return { t: pt.t, value: totalAt(pt, holdingsList) }; });
+  }
+
+  // ---------- history persistence (per-browser) ----------
+  function loadPersistedHistory() {
+    try {
+      var raw = localStorage.getItem(HISTORY_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+  function appendHistory(snapshot) {
+    var h = loadPersistedHistory();
+    h.push(snapshot);
+    var cutoff = Date.now() - 24 * 3600 * 1000;
+    var recent = h.filter(function (p) { return new Date(p.t).getTime() >= cutoff; });
+    var older = h.filter(function (p) { return new Date(p.t).getTime() < cutoff; });
+    var byDate = {};
+    older.forEach(function (p) {
+      var d = new Date(p.t).toISOString().slice(0, 10);
+      if (!byDate[d] || new Date(p.t) > new Date(byDate[d].t)) byDate[d] = p;
+    });
+    var finalHistory = Object.keys(byDate).map(function (k) { return byDate[k]; })
+      .concat(recent)
+      .sort(function (a, b) { return new Date(a.t) - new Date(b.t); });
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(finalHistory));
+    return finalHistory;
+  }
+
+  // ---------- main render ----------
+  function render() {
+    if (!dataReady) return [];
+    var holdings = buildHoldings();
+    var totalValue = holdings.reduce(function (s, h) { return s + h.value; }, 0);
+    var totalCost = holdings.reduce(function (s, h) { return s + h.cost; }, 0);
+    var totalGain = totalValue - totalCost;
+    var totalGainPct = totalCost > 0 ? (totalGain / totalCost * 100) : 0;
+    holdings.forEach(function (h) { h.weight = totalValue > 0 ? (h.value / totalValue * 100) : 0; });
+
+    // hero
+    document.getElementById("s-cost").textContent = fmtKRW(totalCost);
+    document.getElementById("s-value").textContent = fmtKRW(totalValue);
+    var gainEl = document.getElementById("s-gain");
+    gainEl.textContent = fmtKRW(totalGain, true);
+    gainEl.className = "val tnum " + (totalGain >= 0 ? "pos" : "neg");
+    var gainPctEl = document.getElementById("s-gain-pct");
+    gainPctEl.textContent = fmtPct(totalGainPct);
+    gainPctEl.className = "sub tnum " + (totalGain >= 0 ? "pos" : "neg");
+
+    // trend charts — real snapshots only
+    var accentColor = color("accent");
+    var lineColorCss = css("line");
+    var r1 = buildTrend(document.getElementById("t1"), seriesSince(30, holdings), 340, 78, accentColor, lineColorCss);
+    var r2 = buildTrend(document.getElementById("t2"), seriesSince(365, holdings), 340, 78, accentColor, lineColorCss);
+    var r3 = buildTrend(document.getElementById("t3"), seriesSince(null, holdings), 340, 78, accentColor, lineColorCss);
+    pctChip("t1-chg", r1);
+    pctChip("t2-chg", r2);
+    pctChip("t3-chg", r3);
+
+    // portfolio pie + legend (sorted by weight)
+    var byWeight = holdings.slice().sort(function (a, b) { return b.weight - a.weight; });
+    buildPie(document.getElementById("p-holdings"), byWeight.map(function (h) { return { label: h.name, weight: h.weight, color: color(h.color) }; }), 148, 1.4, css("surface"));
+    var lHold = document.getElementById("l-holdings");
+    lHold.innerHTML = "";
+    byWeight.forEach(function (h) {
+      var item = document.createElement("div");
+      item.className = "item";
+      item.innerHTML = '<span class="sw" style="background:' + color(h.color) + '"></span>' +
+        '<span class="nm">' + h.name + '</span>' +
+        '<span class="vl">' + fmtKRW(h.value) + '</span>' +
+        '<span class="wt">' + h.weight.toFixed(1) + '%</span>';
+      lHold.appendChild(item);
+    });
+
+    // volatility pie + legend
+    var volTypes = ["저변동", "고변동", "현금성"];
+    var volColors = { "저변동": "s1", "고변동": "s2", "현금성": "s3" };
+    var volGroups = volTypes.map(function (t) {
+      var items = holdings.filter(function (h) { return h.type === t; });
+      var value = items.reduce(function (s, h) { return s + h.value; }, 0);
+      return { label: t + " 자산", weight: totalValue > 0 ? (value / totalValue * 100) : 0, value: value, color: color(volColors[t]) };
+    });
+    buildPie(document.getElementById("p-vol"), volGroups, 128, 1.4, css("surface"));
+    var lVol = document.getElementById("l-vol");
+    lVol.innerHTML = "";
+    volGroups.forEach(function (g) {
+      var item = document.createElement("div");
+      item.className = "item";
+      item.innerHTML = '<span class="sw" style="background:' + g.color + '"></span>' +
+        '<span class="nm">' + g.label + '</span>' +
+        '<span class="vl">' + fmtKRW(g.value) + '</span>' +
+        '<span class="wt">' + g.weight.toFixed(1) + '%</span>';
+      lVol.appendChild(item);
+    });
+
+    // holdings table — grouped 고변동 → 저변동 → 현금성, weight desc within group
+    var typeOrder = { "고변동": 0, "저변동": 1, "현금성": 2 };
+    var byType = holdings.slice().sort(function (a, b) {
+      return (typeOrder[a.type] - typeOrder[b.type]) || (b.weight - a.weight);
+    });
+    var tbody = document.getElementById("tbody");
+    tbody.innerHTML = "";
+    var currentType = null;
+    byType.forEach(function (h) {
+      if (h.type !== currentType) {
+        currentType = h.type;
+        var groupItems = byType.filter(function (x) { return x.type === currentType; });
+        var groupWeight = groupItems.reduce(function (s, x) { return s + x.weight; }, 0);
+        var gtr = document.createElement("tr");
+        gtr.className = "group-row";
+        gtr.innerHTML = '<td colspan="6">' + currentType + ' 자산</td><td class="grp-wt tnum">' + groupWeight.toFixed(1) + '%</td><td></td>';
+        tbody.appendChild(gtr);
+      }
+      var tr = document.createElement("tr");
+      tr.className = "data-row";
+      tr.innerHTML =
+        '<td><span class="nm-cell"><span class="sw" style="background:' + color(h.color) + '"></span>' + h.name + '</span></td>' +
+        '<td class="tnum">' + fmtQty(h) + '</td>' +
+        '<td class="tnum">' + fmtKRW(h.avgKrw) + '</td>' +
+        '<td class="tnum">' + fmtKRW(h.curKrw) + '</td>' +
+        '<td class="tnum">' + fmtKRW(h.cost) + '</td>' +
+        '<td class="tnum">' + fmtKRW(h.value) + '</td>' +
+        '<td class="tnum">' + h.weight.toFixed(1) + '%</td>' +
+        '<td class="tnum gain ' + (h.gainPct >= 0 ? "pos" : "neg") + '">' + fmtPct(h.gainPct) + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById("row-count").textContent = holdings.length + "개 종목";
+
+    return holdings;
+  }
+
+  // ---------- portfolio tabs ----------
+  function renderTabs() {
+    var store = loadStore();
+    var bar = document.getElementById("tabbar");
+    bar.innerHTML = "";
+    function renameTab(p) {
+      var newName = window.prompt("포트폴리오 이름", p.name);
+      if (newName && newName.trim()) {
+        var s = loadStore();
+        s.list.forEach(function (x) { if (x.id === p.id) x.name = newName.trim(); });
+        saveStore(s);
+        renderTabs();
+      }
+    }
+    store.list.forEach(function (p) {
+      var chip = document.createElement("div");
+      chip.className = "tab-chip" + (p.id === store.activeId ? " active" : "");
+      chip.innerHTML = '<span class="tab-name">' + p.name.replace(/</g, "&lt;") + '</span>' +
+        '<span class="tab-rename" title="이름 바꾸기">✎</span>' +
+        (store.list.length > 1 ? '<span class="tab-close" title="삭제">×</span>' : "");
+      chip.addEventListener("click", function (e) {
+        if (e.target.classList.contains("tab-close") || e.target.classList.contains("tab-rename")) return;
+        var s = loadStore();
+        s.activeId = p.id;
+        saveStore(s);
+        renderTabs();
+        render();
+      });
+      chip.addEventListener("dblclick", function () { renameTab(p); });
+      chip.querySelector(".tab-rename").addEventListener("click", function (e) {
+        e.stopPropagation();
+        renameTab(p);
+      });
+      var closeBtn = chip.querySelector(".tab-close");
+      if (closeBtn) {
+        closeBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (!window.confirm('"' + p.name + '" 포트폴리오를 삭제할까요?')) return;
+          var s = loadStore();
+          s.list = s.list.filter(function (x) { return x.id !== p.id; });
+          if (s.activeId === p.id) s.activeId = s.list[0].id;
+          saveStore(s);
+          renderTabs();
+          render();
+        });
+      }
+      bar.appendChild(chip);
+    });
+    var addBtn = document.createElement("button");
+    addBtn.className = "tab-add";
+    addBtn.title = "포트폴리오 추가";
+    addBtn.textContent = "+";
+    addBtn.addEventListener("click", function () {
+      var s = loadStore();
+      var n = s.list.length + 1;
+      var newP = { id: uid(), name: "포트폴리오 " + n, holdings: [] };
+      s.list.push(newP);
+      s.activeId = newP.id;
+      saveStore(s);
+      renderTabs();
+      render();
+      openModal();
+    });
+    bar.appendChild(addBtn);
+  }
+
+  // ---------- edit modal ----------
+  var overlay = document.getElementById("modal-overlay");
+  var editBody = document.getElementById("edit-tbody");
+  var nameInput = document.getElementById("portfolio-name-input");
+  var currentHoldings = [];
+
+  function catalogOptionsHtml(selectedKey) {
+    return catalog.map(function (c) {
+      return '<option value="' + c.key + '"' + (c.key === selectedKey ? " selected" : "") + '>' + c.label + '</option>';
+    }).join("");
+  }
+
+  function addEditRow(data) {
+    var d = data || { catalogKey: "", name: "", qty: "", avg: "", manualCur: "" };
+    var tr = document.createElement("tr");
+    var isCustom = d.catalogKey === "__CUSTOM__";
+    var isCash = d.catalogKey === "__CASH__";
+    tr.innerHTML =
+      '<td>' +
+        '<select class="f-catalog"><option value="" disabled' + (d.catalogKey ? "" : " selected") + '>종목 선택</option>' + catalogOptionsHtml(d.catalogKey) + '</select>' +
+        '<div class="custom-fields" style="display:' + (isCustom ? "flex" : "none") + '">' +
+          '<input type="text" class="f-customname" placeholder="종목명" value="' + (d.name ? d.name.replace(/"/g, "&quot;") : "") + '">' +
+          '<select class="f-ccy"><option value="KRW"' + (d.ccy === "KRW" ? " selected" : "") + '>KRW</option><option value="USD"' + (d.ccy === "USD" ? " selected" : "") + '>USD</option></select>' +
+          '<select class="f-type"><option value="저변동"' + (d.type === "저변동" ? " selected" : "") + '>저변동</option><option value="고변동"' + (d.type === "고변동" ? " selected" : "") + '>고변동</option><option value="현금성"' + (d.type === "현금성" ? " selected" : "") + '>현금성</option></select>' +
+        '</div>' +
+      '</td>' +
+      '<td><input type="number" class="f-qty" value="' + (d.qty === 0 ? 0 : (d.qty || "")) + '" step="any"' + (isCash ? " disabled" : "") + '></td>' +
+      '<td><input type="number" class="f-avg" value="' + (d.avg === 0 ? 0 : (d.avg || "")) + '" step="any"></td>' +
+      '<td><input type="number" class="f-cur" value="' + (isFinite(d.manualCur) ? d.manualCur : "") + '" step="any"' + (isCustom ? "" : " disabled") + '></td>' +
+      '<td><button type="button" class="row-del" title="삭제">×</button></td>';
+
+    var catalogSelect = tr.querySelector(".f-catalog");
+    var customFields = tr.querySelector(".custom-fields");
+    var qtyInput = tr.querySelector(".f-qty");
+    var curInput = tr.querySelector(".f-cur");
+    catalogSelect.addEventListener("change", function () {
+      var key = catalogSelect.value;
+      customFields.style.display = key === "__CUSTOM__" ? "flex" : "none";
+      curInput.disabled = key !== "__CUSTOM__";
+      qtyInput.disabled = key === "__CASH__";
+      if (key === "__CASH__") qtyInput.value = 1;
+    });
+    tr.querySelector(".row-del").addEventListener("click", function () { tr.remove(); });
+    editBody.appendChild(tr);
+  }
+
+  function openModal() {
+    var store = loadStore();
+    var portfolio = getActivePortfolio(store);
+    nameInput.value = portfolio.name;
+    editBody.innerHTML = "";
+    portfolio.holdings.forEach(function (h) { addEditRow(h); });
+    document.getElementById("edit-reset").textContent = portfolio.id === "p1" ? "스프레드시트 값으로 초기화" : "모두 지우기";
+    overlay.classList.add("open");
+  }
+  function closeModal() { overlay.classList.remove("open"); }
+
+  document.getElementById("edit-open").addEventListener("click", openModal);
+  document.getElementById("edit-cancel").addEventListener("click", closeModal);
+  document.getElementById("edit-add-row").addEventListener("click", function () { addEditRow(); });
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) closeModal(); });
+
+  document.getElementById("edit-reset").addEventListener("click", function () {
+    var store = loadStore();
+    var portfolio = getActivePortfolio(store);
+    portfolio.holdings = portfolio.id === "p1" ? seedDefaultHoldings() : [];
+    saveStore(store);
+    closeModal();
+    renderTabs();
+    currentHoldings = render();
+  });
+
+  document.getElementById("edit-save").addEventListener("click", function () {
+    var store = loadStore();
+    var portfolio = getActivePortfolio(store);
+    portfolio.name = (nameInput.value && nameInput.value.trim()) || portfolio.name;
+
+    var newHoldings = [];
+    var usedColors = 0;
+    Array.prototype.forEach.call(editBody.querySelectorAll("tr"), function (tr, i) {
+      var catalogKey = tr.querySelector(".f-catalog").value;
+      if (!catalogKey) return;
+      var qty = parseFloat(tr.querySelector(".f-qty").value);
+      var avg = parseFloat(tr.querySelector(".f-avg").value);
+      if (!isFinite(qty) || !isFinite(avg)) return;
+      var entry = { rid: uid(), catalogKey: catalogKey, qty: qty, avg: avg, color: PALETTE_SLOTS[usedColors % PALETTE_SLOTS.length] };
+      usedColors++;
+      if (catalogKey === "__CUSTOM__") {
+        entry.name = (tr.querySelector(".f-customname").value || "종목").trim();
+        entry.ccy = tr.querySelector(".f-ccy").value;
+        entry.type = tr.querySelector(".f-type").value;
+        var manualCur = parseFloat(tr.querySelector(".f-cur").value);
+        entry.manualCur = isFinite(manualCur) ? manualCur : avg;
+      } else {
+        var ce = catalogEntry(catalogKey);
+        entry.name = ce.label;
+        entry.ccy = ce.ccy;
+        entry.type = ce.type;
+      }
+      newHoldings.push(entry);
+    });
+
+    portfolio.holdings = newHoldings;
+    saveStore(store);
+    closeModal();
+    renderTabs();
+    currentHoldings = render();
+  });
+
+  // ---------- live data loading ----------
+  var liveStatusEl = document.getElementById("live-status");
+
+  async function loadLiveData() {
+    try {
+      var res = await fetch(API_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var data = await res.json();
+      if (!data.quotes || data.usdKrw == null) throw new Error("empty payload");
+
+      usdKrw = data.usdKrw; usdKrwChgPct = data.usdKrwChgPct;
+      dxy = data.dxy; dxyChgPct = data.dxyChgPct;
+      jpyKrw100 = data.jpyKrw100; jpyKrwChgPct = data.jpyKrwChgPct;
+      usdJpy = data.usdJpy; usdJpyChgPct = data.usdJpyChgPct;
+      quotes = data.quotes;
+      krwQuotes = data.krwQuotes;
+
+      var fetchedIso = new Date(data.fetchedAt * 1000).toISOString();
+      fxAsOf = fetchedIso;
+      usQuoteAsOf = data.usQuoteTime ? new Date(data.usQuoteTime * 1000).toISOString() : fetchedIso;
+      krQuoteAsOf = data.krQuoteTime ? new Date(data.krQuoteTime * 1000).toISOString() : fetchedIso;
+
+      history = appendHistory({ t: fetchedIso, usdKrw: usdKrw, quotes: quotes, krwQuotes: krwQuotes });
+
+      dataReady = true;
+      renderFxStrip();
+      liveStatusEl.textContent = "방금 갱신됨 · 60초마다 자동 갱신";
+      liveStatusEl.style.color = "";
+
+      renderTabs();
+      currentHoldings = render();
+    } catch (e) {
+      console.error("loadLiveData failed:", e);
+      liveStatusEl.textContent = "시세를 불러오지 못했어요 — 곧 다시 시도할게요";
+      liveStatusEl.style.color = "var(--bad)";
+    }
+  }
+
+  history = loadPersistedHistory();
+  loadLiveData();
+  setInterval(loadLiveData, POLL_MS);
+})();
+</script>
+</body>
+</html>
