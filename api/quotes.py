@@ -52,7 +52,9 @@ def twelvedata_batch(symbols):
             price = float(row["close"])
             prev = float(row["previous_close"]) if row.get("previous_close") else None
             chg = float(row["percent_change"]) if row.get("percent_change") not in (None, "") else None
-            out[sym] = {"price": price, "prevClose": prev, "changePct": chg, "time": row.get("timestamp")}
+            # last_quote_at is the actual moment this price tick was captured;
+            # Twelvedata's "timestamp" field is a session/day marker, not live.
+            out[sym] = {"price": price, "prevClose": prev, "changePct": chg, "time": row.get("last_quote_at") or row.get("timestamp")}
             _last_good[sym] = out[sym]
     except Exception as e:
         for sym in symbols:
