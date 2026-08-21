@@ -516,7 +516,7 @@
   function fmtAsOf(iso) {
     if (!iso) return "-";
     var d = new Date(iso);
-    return d.toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return d.toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
   // ---------- FX strip ----------
@@ -1103,7 +1103,10 @@
 
   history = loadPersistedHistory();
   loadLiveData();
-  loadDxy();
+  // Staggered, not simultaneous: /api/quotes (7 Twelvedata credits) and
+  // /api/dxy (6 credits) firing in the same wall-clock minute would together
+  // exceed the free tier's 8-credit/minute cap and both would fail.
+  setTimeout(loadDxy, 15000);
   setInterval(loadLiveData, POLL_MS);
   setInterval(loadDxy, DXY_POLL_MS);
 })();
