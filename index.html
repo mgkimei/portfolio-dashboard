@@ -146,6 +146,15 @@
   .pie-legend .wt { font-family: "IBM Plex Mono", monospace; color: var(--ink2); font-weight: 600; width: 48px; text-align: right; flex: none; }
   .pie-legend .vl { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-size: 11px; width: 96px; text-align: right; flex: none; }
 
+  /* ---- memo ---- */
+  .memo-textarea {
+    width: 100%; min-height: 340px; resize: vertical;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--ink); font-family: "IBM Plex Sans", sans-serif; font-size: 13.5px; line-height: 1.6;
+    padding: 14px 16px; box-sizing: border-box;
+  }
+  .memo-textarea:focus { outline: none; border-color: var(--accent); }
+
   /* ---- table ---- */
   .table-card table { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; width: 100%; }
   .table-card thead th { text-align: right; font-weight: 500; color: var(--muted); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; padding: 0 10px 10px 0; border-bottom: 1px solid var(--line); font-family: "IBM Plex Sans", sans-serif; }
@@ -171,7 +180,7 @@
   tr.group-row .grp-wt { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-weight: 500; }
 
   /* ---- edit button + modal ---- */
-  .edit-row { display: flex; justify-content: center; margin-top: 20px; }
+  .edit-row { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
   .edit-btn {
     appearance: none; border: 1px solid var(--line); background: var(--surface);
     color: var(--ink); font-size: 13px; font-weight: 500; padding: 11px 20px;
@@ -337,8 +346,24 @@
 
   <div class="edit-row">
     <button class="edit-btn" id="edit-open">✎ 보유 종목 수정</button>
+    <button class="edit-btn" id="memo-open">📝 메모</button>
   </div>
 
+</div>
+
+<div class="modal-overlay" id="memo-modal-overlay">
+  <div class="modal">
+    <h2>메모</h2>
+    <p class="modal-sub">이 포트폴리오에 자유롭게 메모를 남기세요 — 매매 계획, 이유, 뭐든 좋아요.</p>
+    <textarea class="memo-textarea" id="memo-textarea" placeholder="예: TSLA 300불 아래에서 분할매수, 1차 5백만원..."></textarea>
+    <div class="modal-actions">
+      <div class="left"></div>
+      <div class="left">
+        <button class="btn" id="memo-cancel">취소</button>
+        <button class="btn primary" id="memo-save">저장</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="modal-overlay">
@@ -985,6 +1010,30 @@
     });
     bar.appendChild(addBtn);
   }
+
+  // ---------- memo ----------
+  var memoOverlay = document.getElementById("memo-modal-overlay");
+  var memoTextarea = document.getElementById("memo-textarea");
+
+  function openMemoModal() {
+    var store = loadStore();
+    var portfolio = getActivePortfolio(store);
+    memoTextarea.value = portfolio.memo || "";
+    memoOverlay.classList.add("open");
+    memoTextarea.focus();
+  }
+  function closeMemoModal() { memoOverlay.classList.remove("open"); }
+
+  document.getElementById("memo-open").addEventListener("click", openMemoModal);
+  document.getElementById("memo-cancel").addEventListener("click", closeMemoModal);
+  memoOverlay.addEventListener("click", function (e) { if (e.target === memoOverlay) closeMemoModal(); });
+  document.getElementById("memo-save").addEventListener("click", function () {
+    var store = loadStore();
+    var portfolio = getActivePortfolio(store);
+    portfolio.memo = memoTextarea.value;
+    saveStore(store);
+    closeMemoModal();
+  });
 
   // ---------- edit modal ----------
   var overlay = document.getElementById("modal-overlay");
