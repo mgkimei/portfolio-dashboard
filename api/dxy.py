@@ -80,7 +80,8 @@ class handler(BaseHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "s-maxage=280, stale-while-revalidate=120")
+        # Matches the frontend's 60-minute poll interval - see quotes.py for why.
+        self.send_header("Cache-Control", "s-maxage=3500, stale-while-revalidate=300")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)

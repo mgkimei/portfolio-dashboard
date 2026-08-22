@@ -119,7 +119,11 @@ class handler(BaseHTTPRequestHandler):
             body = json.dumps({"error": str(e)}).encode("utf-8")
             self.send_response(500)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "s-maxage=45, stale-while-revalidate=60")
+        # Matches the frontend's 15-minute poll interval - Vercel's edge cache
+        # serves this to every viewer/tab in that window from one upstream
+        # call, which is what actually keeps daily credit usage sustainable
+        # regardless of how many people have the page open.
+        self.send_header("Cache-Control", "s-maxage=840, stale-while-revalidate=120")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
