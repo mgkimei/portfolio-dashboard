@@ -344,13 +344,13 @@
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
     <h2>보유 종목 수정</h2>
-    <p class="modal-sub">목록에서 종목을 고르고 수량 · 평단가만 채우면 나머지(현재가·평가금액·비중·손익)는 자동으로 계산돼요. 목록에 없는 종목은 "직접 입력"으로 추가하고 현재가를 수동으로 넣어주세요 — 자동 갱신은 안 돼요.</p>
+    <p class="modal-sub">목록에서 종목을 고르고 수량 · 평단가만 채우면 나머지(현재가·평가금액·비중·손익)는 자동으로 계산돼요. 목록에 없는 종목은 "직접 입력"으로 추가하고 현재가를 수동으로 넣어주세요 — 자동 갱신은 안 돼요. 달러·엔화 종목은 <b>매수시점환율</b>을 넣으면 투자원금이 실제 매수 당시 환율로 계산돼요 — 비워두면 오늘 환율로 계산돼요.</p>
     <div class="portfolio-name-row">
       <label>포트폴리오 이름</label>
       <input type="text" id="portfolio-name-input">
     </div>
     <table class="edit-table">
-      <thead><tr><th style="width:44%">종목</th><th style="width:16%">수량</th><th style="width:16%">평단가</th><th style="width:16%">현재가(수동)</th><th style="width:8%"></th></tr></thead>
+      <thead><tr><th style="width:32%">종목</th><th style="width:12%">수량</th><th style="width:14%">평단가</th><th style="width:16%">매수시점환율</th><th style="width:16%">현재가(수동)</th><th style="width:6%"></th></tr></thead>
       <tbody id="edit-tbody"></tbody>
     </table>
     <button class="add-row-btn" id="edit-add-row">+ 종목 추가</button>
@@ -470,6 +470,20 @@
     return (live != null && isFinite(live)) ? live : h.avg;
   }
 
+  // Today's live FX multiplier for a given holding currency, to KRW.
+  // USD: KRW per 1 USD. JPY: KRW per 1 JPY (jpyKrw100 is quoted per 100 JPY).
+  function fxMultiplierToday(ccy) {
+    if (ccy === "USD") return usdKrw;
+    if (ccy === "JPY") return jpyKrw100 != null ? jpyKrw100 / 100 : null;
+    return 1;
+  }
+  // The rate the user actually paid at purchase, if they entered one (also
+  // KRW per 1 unit of foreign currency - JPY inputs are per-100-yen, so /100).
+  function fxMultiplierAtPurchase(h) {
+    if (!isFinite(h.fxAtPurchase)) return null;
+    return h.ccy === "JPY" ? h.fxAtPurchase / 100 : h.fxAtPurchase;
+  }
+
   function buildHoldings() {
     var store = loadStore();
     var portfolio = getActivePortfolio(store);
@@ -477,9 +491,13 @@
       var h = JSON.parse(JSON.stringify(d));
       h.id = h.rid;
       h.cur = priceFor(h);
-      var mult = h.ccy === "USD" ? usdKrw : 1;
-      h.avgKrw = h.avg * mult;
-      h.curKrw = h.cur * mult;
+      var todayMult = fxMultiplierToday(h.ccy);
+      var purchaseMult = fxMultiplierAtPurchase(h);
+      // Cost basis (평단가/투자원금) uses the FX rate at purchase time when the
+      // user has provided one - otherwise falls back to today's rate, same as
+      // before. Current value (현재가/평가금액) always uses today's rate.
+      h.avgKrw = h.avg * (purchaseMult != null ? purchaseMult : todayMult);
+      h.curKrw = h.cur * todayMult;
       h.value = h.qty * h.curKrw;
       h.cost = h.qty * h.avgKrw;
       h.gain = h.value - h.cost;
@@ -953,7 +971,7 @@
   }
 
   function addEditRow(data) {
-    var d = data || { catalogKey: "", name: "", qty: "", avg: "", manualCur: "" };
+    var d = data || { catalogKey: "", name: "", qty: "", avg: "", manualCur: "", fxAtPurchase: "" };
     var tr = document.createElement("tr");
     var isCustom = d.catalogKey === "__CUSTOM__";
     var isCash = d.catalogKey === "__CASH__";
@@ -962,26 +980,48 @@
         '<select class="f-catalog"><option value="" disabled' + (d.catalogKey ? "" : " selected") + '>종목 선택</option>' + catalogOptionsHtml(d.catalogKey) + '</select>' +
         '<div class="custom-fields" style="display:' + (isCustom ? "flex" : "none") + '">' +
           '<input type="text" class="f-customname" placeholder="종목명" value="' + (d.name ? d.name.replace(/"/g, "&quot;") : "") + '">' +
-          '<select class="f-ccy"><option value="KRW"' + (d.ccy === "KRW" ? " selected" : "") + '>KRW</option><option value="USD"' + (d.ccy === "USD" ? " selected" : "") + '>USD</option></select>' +
+          '<select class="f-ccy"><option value="KRW"' + (d.ccy === "KRW" ? " selected" : "") + '>KRW</option><option value="USD"' + (d.ccy === "USD" ? " selected" : "") + '>USD</option><option value="JPY"' + (d.ccy === "JPY" ? " selected" : "") + '>JPY</option></select>' +
           '<select class="f-type"><option value="저변동"' + (d.type === "저변동" ? " selected" : "") + '>저변동</option><option value="고변동"' + (d.type === "고변동" ? " selected" : "") + '>고변동</option><option value="현금성"' + (d.type === "현금성" ? " selected" : "") + '>현금성</option></select>' +
         '</div>' +
       '</td>' +
       '<td><input type="number" class="f-qty" value="' + (d.qty === 0 ? 0 : (d.qty || "")) + '" step="any"' + (isCash ? " disabled" : "") + '></td>' +
       '<td><input type="number" class="f-avg" value="' + (d.avg === 0 ? 0 : (d.avg || "")) + '" step="any"></td>' +
+      '<td><input type="number" class="f-fx" value="' + (isFinite(d.fxAtPurchase) ? d.fxAtPurchase : "") + '" step="any"></td>' +
       '<td><input type="number" class="f-cur" value="' + (isFinite(d.manualCur) ? d.manualCur : "") + '" step="any"' + (isCustom ? "" : " disabled") + '></td>' +
       '<td><button type="button" class="row-del" title="삭제">×</button></td>';
 
     var catalogSelect = tr.querySelector(".f-catalog");
     var customFields = tr.querySelector(".custom-fields");
+    var customCcySelect = tr.querySelector(".f-ccy");
     var qtyInput = tr.querySelector(".f-qty");
     var curInput = tr.querySelector(".f-cur");
+    var fxInput = tr.querySelector(".f-fx");
+
+    function effectiveCcy() {
+      var key = catalogSelect.value;
+      if (key === "__CUSTOM__") return customCcySelect.value;
+      if (!key || key === "__CASH__") return "KRW";
+      var ce = catalogEntry(key);
+      return ce ? ce.ccy : "KRW";
+    }
+    function updateFxState() {
+      var ccy = effectiveCcy();
+      var needsFx = ccy === "USD" || ccy === "JPY";
+      fxInput.disabled = !needsFx;
+      fxInput.placeholder = ccy === "USD" ? "예: 1320 (원/달러)" : ccy === "JPY" ? "예: 890 (원/100엔)" : "";
+      if (!needsFx) fxInput.value = "";
+    }
     catalogSelect.addEventListener("change", function () {
       var key = catalogSelect.value;
       customFields.style.display = key === "__CUSTOM__" ? "flex" : "none";
       curInput.disabled = key !== "__CUSTOM__";
       qtyInput.disabled = key === "__CASH__";
       if (key === "__CASH__") qtyInput.value = 1;
+      updateFxState();
     });
+    customCcySelect.addEventListener("change", updateFxState);
+    updateFxState();
+
     tr.querySelector(".row-del").addEventListener("click", function () { tr.remove(); });
     editBody.appendChild(tr);
   }
@@ -1038,6 +1078,10 @@
         entry.name = ce.label;
         entry.ccy = ce.ccy;
         entry.type = ce.type;
+      }
+      if (entry.ccy === "USD" || entry.ccy === "JPY") {
+        var fxAtPurchase = parseFloat(tr.querySelector(".f-fx").value);
+        if (isFinite(fxAtPurchase)) entry.fxAtPurchase = fxAtPurchase;
       }
       newHoldings.push(entry);
     });
