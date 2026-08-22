@@ -391,20 +391,44 @@
 
   // Catalog of instruments the dashboard can auto-price. "__CASH__" and "__CUSTOM__"
   // are special keys handled separately from the live quote lookups.
-  var catalog = [
+  var builtinCatalog = [
     { key: "TIGER 미국S&P500동일가중", label: "TIGER 미국S&P500동일가중", ccy: "KRW", type: "저변동" },
     { key: "TIGER 미국배당다우존스",   label: "TIGER 미국배당다우존스",   ccy: "KRW", type: "저변동" },
     { key: "GLD",  label: "GLD",  ccy: "USD", type: "저변동" },
     { key: "CRCL", label: "CRCL", ccy: "USD", type: "고변동" },
     { key: "MSTR", label: "MSTR", ccy: "USD", type: "고변동" },
     { key: "MSTU", label: "MSTU", ccy: "USD", type: "고변동" },
-    { key: "TSLA", label: "TSLA", ccy: "USD", type: "고변동" },
-    { key: "__CASH__",   label: "현금(원화)",         ccy: "KRW", type: "현금성" },
-    { key: "__CUSTOM__", label: "직접 입력 (수동 현재가)", ccy: "KRW", type: "저변동" }
+    { key: "TSLA", label: "TSLA", ccy: "USD", type: "고변동" }
   ];
+  var CASH_OPTION = { key: "__CASH__", label: "현금(원화)", ccy: "KRW", type: "현금성" };
+  var CUSTOM_TRIGGER = { key: "__CUSTOM__", label: "+ 새 종목 직접 입력", ccy: "KRW", type: "저변동" };
+
+  // Custom instruments the user has typed in via "직접 입력" - remembered so
+  // they show up as a normal pick next time, instead of re-typing every time.
+  var CUSTOM_CATALOG_KEY = "customCatalog.v1";
+  function loadCustomCatalog() {
+    try {
+      var raw = localStorage.getItem(CUSTOM_CATALOG_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+  function saveCustomCatalog(list) { localStorage.setItem(CUSTOM_CATALOG_KEY, JSON.stringify(list)); }
+  function upsertCustomCatalog(entry) {
+    var list = loadCustomCatalog();
+    var idx = -1;
+    list.forEach(function (c, i) { if (c.key === entry.key) idx = i; });
+    if (idx >= 0) list[idx] = entry; else list.push(entry);
+    saveCustomCatalog(list);
+  }
+  function isManualPriceKey(key) {
+    return key === "__CUSTOM__" || (typeof key === "string" && key.indexOf("CUSTOM:") === 0);
+  }
+  function fullCatalog() {
+    return builtinCatalog.concat(loadCustomCatalog()).concat([CASH_OPTION, CUSTOM_TRIGGER]);
+  }
   function catalogEntry(key) {
     var found = null;
-    catalog.forEach(function (c) { if (c.key === key) found = c; });
+    fullCatalog().forEach(function (c) { if (c.key === key) found = c; });
     return found;
   }
   var PALETTE_SLOTS = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
@@ -465,7 +489,7 @@
 
   function priceFor(h) {
     if (h.catalogKey === "__CASH__") return h.avg;
-    if (h.catalogKey === "__CUSTOM__") return isFinite(h.manualCur) ? h.manualCur : h.avg;
+    if (isManualPriceKey(h.catalogKey)) return isFinite(h.manualCur) ? h.manualCur : h.avg;
     var live = h.ccy === "USD" ? quotes[h.catalogKey] : krwQuotes[h.catalogKey];
     return (live != null && isFinite(live)) ? live : h.avg;
   }
@@ -745,7 +769,7 @@
   function totalAt(snapshot, holdingsList) {
     return holdingsList.reduce(function (sum, h) {
       var price;
-      if (h.catalogKey === "__CASH__" || h.catalogKey === "__CUSTOM__") {
+      if (h.catalogKey === "__CASH__" || isManualPriceKey(h.catalogKey)) {
         price = h.curKrw;
       } else if (h.ccy === "USD") {
         var usd = (snapshot.quotes && snapshot.quotes[h.catalogKey] != null) ? snapshot.quotes[h.catalogKey] : (h.cur);
@@ -965,7 +989,7 @@
   var currentHoldings = [];
 
   function catalogOptionsHtml(selectedKey) {
-    return catalog.map(function (c) {
+    return fullCatalog().map(function (c) {
       return '<option value="' + c.key + '"' + (c.key === selectedKey ? " selected" : "") + '>' + c.label + '</option>';
     }).join("");
   }
@@ -987,7 +1011,7 @@
       '<td><input type="number" class="f-qty" value="' + (d.qty === 0 ? 0 : (d.qty || "")) + '" step="any"' + (isCash ? " disabled" : "") + '></td>' +
       '<td><input type="number" class="f-avg" value="' + (d.avg === 0 ? 0 : (d.avg || "")) + '" step="any"></td>' +
       '<td><input type="number" class="f-fx" value="' + (isFinite(d.fxAtPurchase) ? d.fxAtPurchase : "") + '" step="any"></td>' +
-      '<td><input type="number" class="f-cur" value="' + (isFinite(d.manualCur) ? d.manualCur : "") + '" step="any"' + (isCustom ? "" : " disabled") + '></td>' +
+      '<td><input type="number" class="f-cur" value="' + (isFinite(d.manualCur) ? d.manualCur : "") + '" step="any"' + (isManualPriceKey(d.catalogKey) ? "" : " disabled") + '></td>' +
       '<td><button type="button" class="row-del" title="삭제">×</button></td>';
 
     var catalogSelect = tr.querySelector(".f-catalog");
@@ -1014,7 +1038,7 @@
     catalogSelect.addEventListener("change", function () {
       var key = catalogSelect.value;
       customFields.style.display = key === "__CUSTOM__" ? "flex" : "none";
-      curInput.disabled = key !== "__CUSTOM__";
+      curInput.disabled = !isManualPriceKey(key);
       qtyInput.disabled = key === "__CASH__";
       if (key === "__CASH__") qtyInput.value = 1;
       updateFxState();
@@ -1068,9 +1092,17 @@
       var entry = { rid: uid(), catalogKey: catalogKey, qty: qty, avg: avg, color: PALETTE_SLOTS[usedColors % PALETTE_SLOTS.length] };
       usedColors++;
       if (catalogKey === "__CUSTOM__") {
-        entry.name = (tr.querySelector(".f-customname").value || "종목").trim();
-        entry.ccy = tr.querySelector(".f-ccy").value;
-        entry.type = tr.querySelector(".f-type").value;
+        var customName = (tr.querySelector(".f-customname").value || "종목").trim();
+        var customCcy = tr.querySelector(".f-ccy").value;
+        var customType = tr.querySelector(".f-type").value;
+        var stableKey = "CUSTOM:" + customName;
+        // Remember this instrument so it shows up as a normal pick next time,
+        // instead of having to re-type it via "직접 입력" again.
+        upsertCustomCatalog({ key: stableKey, label: customName, ccy: customCcy, type: customType });
+        entry.catalogKey = stableKey;
+        entry.name = customName;
+        entry.ccy = customCcy;
+        entry.type = customType;
         var manualCur = parseFloat(tr.querySelector(".f-cur").value);
         entry.manualCur = isFinite(manualCur) ? manualCur : avg;
       } else {
@@ -1078,6 +1110,10 @@
         entry.name = ce.label;
         entry.ccy = ce.ccy;
         entry.type = ce.type;
+        if (isManualPriceKey(catalogKey)) {
+          var manualCur2 = parseFloat(tr.querySelector(".f-cur").value);
+          entry.manualCur = isFinite(manualCur2) ? manualCur2 : avg;
+        }
       }
       if (entry.ccy === "USD" || entry.ccy === "JPY") {
         var fxAtPurchase = parseFloat(tr.querySelector(".f-fx").value);
