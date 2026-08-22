@@ -308,7 +308,7 @@
       <div id="t3"></div>
     </div>
   </div>
-  <p class="trend-disclaimer">※ 이 브라우저에 저장된 실제 시세 기록만 표시해요. 페이지를 열 때마다(60초마다도) 스냅샷이 쌓이면서 점이 하나씩 늘어나요 — 다른 기기·브라우저에서는 그 기기 자체의 기록부터 다시 쌓여요.</p>
+  <p class="trend-disclaimer">※ 이 브라우저에 저장된 실제 시세 기록만 표시해요. 페이지를 열 때마다(15분마다도) 스냅샷이 쌓이면서 점이 하나씩 늘어나요 — 다른 기기·브라우저에서는 그 기기 자체의 기록부터 다시 쌓여요.</p>
 
   <div class="pie-row">
     <div class="card pie-card">
@@ -375,8 +375,12 @@
   var HISTORY_KEY = "priceHistory.v1";
   var API_URL = "/api/quotes";
   var DXY_URL = "/api/dxy";
-  var POLL_MS = 60000;
-  var DXY_POLL_MS = 300000;
+  // Twelvedata's free tier is 800 credits/DAY (not just per-minute) - quotes
+  // costs 7 credits/call, dxy costs 6. 60-second polling burns the entire
+  // day's quota in a couple hours, so these need to be spread out much
+  // further apart to actually last a full day of the tab staying open.
+  var POLL_MS = 900000;   // 15 min: 7 credits x 4/hr x ~16h ≈ 448/day
+  var DXY_POLL_MS = 3600000; // 60 min: 6 credits x 1/hr x ~16h ≈ 96/day
 
   // ---------- live market data (populated by loadLiveData(), see bottom) ----------
   var usdKrw = null, usdKrwChgPct = null;
@@ -1155,7 +1159,7 @@
 
       dataReady = true;
       renderFxStrip();
-      liveStatusEl.textContent = "방금 갱신됨 · 60초마다 자동 갱신";
+      liveStatusEl.textContent = "방금 갱신됨 · 15분마다 자동 갱신";
       liveStatusEl.style.color = "";
 
       renderTabs();
@@ -1182,6 +1186,10 @@
   }
 
   history = loadPersistedHistory();
+  // Tabs (and the edit modal they open) must work even when the live price
+  // fetch is down or rate-limited - portfolio management shouldn't depend on
+  // that succeeding.
+  renderTabs();
   loadLiveData();
   // Staggered, not simultaneous: /api/quotes (7 Twelvedata credits) and
   // /api/dxy (6 credits) firing in the same wall-clock minute would together
